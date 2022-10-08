@@ -23,7 +23,12 @@ except ImportError:
     import config
 
 import winput, time, ctypes, zlib, json
+import pyautogui
+import numpy as np
+from PIL import Image
 
+GLOBAL_W = 64
+GLOBAL_H = 64
 float_to_bytes = lambda f: bytes(ctypes.c_float(f))
 bytes_to_float = lambda b: ctypes.cast(b, ctypes.POINTER(ctypes.c_float)).contents.value
 
@@ -288,9 +293,67 @@ class MouseButtonEvent(MacroEvent):
 
 class MouseButtonPressEvent(MouseButtonEvent):
     bytecode = b"B"
+
+    def __init__(self, mouse_button, region_data):
+        super().__init__(mouse_button)
+        self.region_data = region_data
+        # print("__init__={}".format(self.region_data))
+
+    def to_bytes(self):
+        return self.bytecode + self.mouse_button.to_bytes(1, "little") + self.region_data.tobytes()
+    
+    @classmethod
+    def from_bytes(cls, config, bytes_obj):
+        assert type(bytes_obj) == bytes and len(bytes_obj) >= 2 and bytes_obj[0:1] == cls.bytecode
+        deserialized_bytes = np.frombuffer(bytes_obj[2:], dtype=np.uint8)
+        deserialized = np.reshape(deserialized_bytes, newshape=(GLOBAL_W, GLOBAL_H, 3))
+        # print("deserialized={}".format(deserialized))
+        return MouseButtonPressEvent(int.from_bytes(bytes_obj[1:2], "little"), deserialized)
+
+    @staticmethod
+    def is_match(rd, fd, sx, sy, w, h):
+        return np.array_equal(rd, fd[sy:sy+h, sx:sx+w])
+
+    @staticmethod
+    def get_mouse_position(regn_data, full_data, mouse_x0, mouse_y0):
+        check_x = mouse_x0
+        check_y = mouse_y0
+
+        # print("check_x sx={} sy={}".format(check_x, check_y))
+        for x in range(0, 400):
+            for y in range(0, 400):
+                xdir = 1 if x % 2 == 0 else -1
+                ydir = 1 if y % 2 == 0 else -1
+                sx = max(0, check_x + int((x / 2) * xdir))
+                sy = max(0, check_y + int((y / 2) * ydir))
+                # print("check sx={} sy={}".format(sx,sy))
+                if MouseButtonPressEvent.is_match(regn_data, full_data, sx, sy, GLOBAL_W, GLOBAL_H):
+                    #print("found sx={} sy={}".format(sx, sy))
+                    return (sx, sy)
+        return None        
     
     def execute(self):
-        winput.press_mouse_button(self.mouse_button)
+        found = False
+        (mouse_x0, mouse_y0) = winput.get_mouse_pos()
+        for zz in range(0,4):
+            full_img = pyautogui.screenshot(region=[0, 0, 1920, 1080]) # x,y,w,h
+            full_data = np.asarray(full_img)
+            mouse_should_pos = MouseButtonPressEvent.get_mouse_position(self.region_data, full_data, mouse_x0, mouse_y0)
+            if mouse_should_pos == None:
+                regn_img2 = Image.fromarray(np.uint8(self.region_data))
+                regn_img2.save('test_match/screenshot_regn.png')
+                full_img.save('test_match/screenshot_full.png')
+                print("mouse position no matched! mouse pos={}".format((mouse_x0, mouse_y0)))
+                time.sleep(0.5)
+                continue
+            (mouse_x, mouse_y) = mouse_should_pos
+            winput.set_mouse_pos(mouse_x + int(GLOBAL_W/2), int(mouse_y + GLOBAL_H/2))
+            winput.press_mouse_button(self.mouse_button)
+            found = True
+            break
+        if not found:
+            winput.set_mouse_pos(mouse_x0, mouse_y0)
+            winput.press_mouse_button(self.mouse_button)
 
     def __str__(self):
         return "Press {} mouse button".format(util.mouse_button_to_name(self.mouse_button).lower())
@@ -422,21 +485,21 @@ class EventExecutor:
     def to_bytes(self):
         data = self.time_offset.to_bytes(8, "little") + self.event.to_bytes()
 
-        return len(data).to_bytes(1, "little") + data
+        return len(data).to_bytes(2, "little") + data
 
     @classmethod
     def from_bytes(cls, config, bytes_obj):
-        assert type(bytes_obj) == bytes and len(bytes_obj) >= 10 and bytes_obj[0] + 1 == len(bytes_obj)
+        assert type(bytes_obj) == bytes and len(bytes_obj) >= 10 and int.from_bytes(bytes_obj[0:2], "little") + 2 == len(bytes_obj)
         
-        time_offset = int.from_bytes(bytes_obj[1:9], "little")
+        time_offset = int.from_bytes(bytes_obj[2:10], "little")
 
-        event_type = bytes_obj[9:10]
+        event_type = bytes_obj[10:11]
 
         assert event_type in event_bytecode_class_map, "Unknown event bytecode '{}'".format(event_type)
 
         event_class = event_bytecode_class_map[event_type]
 
-        event = event_class.from_bytes(config, bytes_obj[9:])
+        event = event_class.from_bytes(config, bytes_obj[10:])
 
         return cls(time_offset, event)
 
@@ -567,7 +630,7 @@ class Macro:
         event_executor_list = []
 
         while offset < len(bytes_obj):
-            event_data_length = bytes_obj[offset] + 1
+            event_data_length = int.from_bytes(bytes_obj[offset:offset+2], "little") + 2
 
             assert offset + event_data_length <= len(bytes_obj)
 
@@ -585,6 +648,10 @@ class Macro:
 
     @staticmethod
     def from_raw_data(name, start_time, start_mouse_pos, screen_width, screen_height, raw_data):
+        import pyautogui
+        import numpy as np
+        from PIL import Image
+
         event_executor_list = []
 
         macro_config = MacroConfig(screen_width, screen_height)
@@ -605,25 +672,26 @@ class Macro:
                     last_mouse_pos = raw_event.position
 
                 elif raw_event.action == winput.WM_LBUTTONDOWN:
-                    event = MouseButtonPressEvent(winput.LEFT_MOUSE_BUTTON)
+                    event = MouseButtonPressEvent(winput.LEFT_MOUSE_BUTTON, raw_event.additional_data)
+ 
 
                 elif raw_event.action == winput.WM_LBUTTONUP:
                     event = MouseButtonReleaseEvent(winput.LEFT_MOUSE_BUTTON)
 
                 elif raw_event.action == winput.WM_RBUTTONDOWN:
-                    event = MouseButtonPressEvent(winput.RIGHT_MOUSE_BUTTON)
+                    event = MouseButtonPressEvent(winput.RIGHT_MOUSE_BUTTON, np.uint8([]))
 
                 elif raw_event.action == winput.WM_RBUTTONUP:
                     event = MouseButtonReleaseEvent(winput.RIGHT_MOUSE_BUTTON)
 
                 elif raw_event.action == winput.WM_MBUTTONDOWN:
-                    event = MouseButtonPressEvent(winput.MIDDLE_MOUSE_BUTTON)
+                    event = MouseButtonPressEvent(winput.MIDDLE_MOUSE_BUTTON, np.uint8([]))
 
                 elif raw_event.action == winput.WM_MBUTTONUP:
                     event = MouseButtonReleaseEvent(winput.MIDDLE_MOUSE_BUTTON)
 
                 elif raw_event.action == winput.WM_XBUTTONDOWN:
-                    event = MouseButtonPressEvent(getattr(winput, "XMB" + str(raw_event.additional_data)))
+                    event = MouseButtonPressEvent(getattr(winput, "XMB" + str(raw_event.additional_data)), np.uint8([]))
 
                 elif raw_event.action == winput.WM_XBUTTONUP:
                     event = MouseButtonReleaseEvent(getattr(winput, "XMB" + str(raw_event.additional_data)))
@@ -657,6 +725,12 @@ class Macro:
 def callback(event):
     global raw_data
 
+    if type(event) == winput.MouseEvent:
+        if event.action == winput.WM_LBUTTONDOWN:
+            beg_x = max(0, event.position[0] - int(GLOBAL_W/2))
+            beg_y = max(0, event.position[1] - int(GLOBAL_H/2))
+            img = pyautogui.screenshot(region=[beg_x, beg_y, GLOBAL_W, GLOBAL_H])
+            event.additional_data = np.asarray(img)
     raw_data.append((perf_counter_ns(), event))
 
 def callback_with_stop_key(event):
