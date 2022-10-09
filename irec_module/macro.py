@@ -328,9 +328,9 @@ class MouseButtonPressEvent(MouseButtonEvent):
             for y in range(0, GLOBAL_H):
                 regn_pixel = regn_data[y, x]
                 full_pixel = full_data[check_y + y, check_x + x]
-                diff_r = full_pixel[0] - regn_pixel[0]
-                diff_g = full_pixel[1] - regn_pixel[1]
-                diff_b = full_pixel[2] - regn_pixel[2]
+                diff_r = int(full_pixel[0]) - int(regn_pixel[0])
+                diff_g = int(full_pixel[1]) - int(regn_pixel[1])
+                diff_b = int(full_pixel[2]) - int(regn_pixel[2])
 
                 if abs(diff_r) > 10 or abs(diff_g) > 10 or abs(diff_b) > 10:
                     found = False
