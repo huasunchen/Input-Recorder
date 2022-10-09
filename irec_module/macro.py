@@ -331,9 +331,10 @@ class MouseButtonPressEvent(MouseButtonEvent):
                 diff_r = int(full_pixel[0]) - int(regn_pixel[0])
                 diff_g = int(full_pixel[1]) - int(regn_pixel[1])
                 diff_b = int(full_pixel[2]) - int(regn_pixel[2])
-
-                if abs(diff_r) > 10 or abs(diff_g) > 10 or abs(diff_b) > 10:
+                DIFF = 26
+                if abs(diff_r) > DIFF or abs(diff_g) > DIFF or abs(diff_b) > DIFF:
                     found = False
+                    print(diff_r,diff_g,diff_b)
                     break
             if not found:
                 break
@@ -361,8 +362,8 @@ class MouseButtonPressEvent(MouseButtonEvent):
     def execute(self):
         found = False
         (mouse_x0, mouse_y0) = winput.get_mouse_pos()
-        for zz in range(0,4):
-            full_img = pyautogui.screenshot(region=[0, 0, 1920, 1080]) # x,y,w,h
+        for zz in range(0,100):
+            full_img = pyautogui.screenshot(region=[0, 0, mouse_x0+GLOBAL_W, mouse_y0+GLOBAL_H]) # x,y,w,h
             full_data = np.asarray(full_img)
             mouse_should_pos = MouseButtonPressEvent.get_mouse_position(self.region_data, full_data, mouse_x0, mouse_y0)
             if mouse_should_pos == None:
@@ -370,15 +371,15 @@ class MouseButtonPressEvent(MouseButtonEvent):
                 regn_img2.save('test_match/screenshot_regn.png')
                 full_img.save('test_match/screenshot_full.png')
                 print("mouse position no matched! mouse pos={}".format((mouse_x0, mouse_y0)))
-                time.sleep(0.5)
+                time.sleep(0.05)
                 continue
             (mouse_x, mouse_y) = mouse_should_pos
-            winput.set_mouse_pos(mouse_x + int(GLOBAL_W/2), int(mouse_y + GLOBAL_H/2))
+            #winput.set_mouse_pos(mouse_x + int(GLOBAL_W/2), int(mouse_y + GLOBAL_H/2))
             winput.press_mouse_button(self.mouse_button)
             found = True
             break
         if not found:
-            winput.set_mouse_pos(mouse_x0, mouse_y0)
+            #winput.set_mouse_pos(mouse_x0, mouse_y0)
             winput.press_mouse_button(self.mouse_button)
 
     def __str__(self):
