@@ -27,8 +27,11 @@ import pyautogui
 import numpy as np
 from PIL import Image
 
-GLOBAL_W = 64
-GLOBAL_H = 64
+GLOBAL_W = 4
+GLOBAL_H = 4
+GLOBAL_HALF_W = int(GLOBAL_W/2)
+GLOBAL_HALF_H = int(GLOBAL_H/2)
+
 float_to_bytes = lambda f: bytes(ctypes.c_float(f))
 bytes_to_float = lambda b: ctypes.cast(b, ctypes.POINTER(ctypes.c_float)).contents.value
 
@@ -319,18 +322,41 @@ class MouseButtonPressEvent(MouseButtonEvent):
         check_x = mouse_x0
         check_y = mouse_y0
 
+        found = True
         # print("check_x sx={} sy={}".format(check_x, check_y))
-        for x in range(0, 400):
-            for y in range(0, 400):
-                xdir = 1 if x % 2 == 0 else -1
-                ydir = 1 if y % 2 == 0 else -1
-                sx = max(0, check_x + int((x / 2) * xdir))
-                sy = max(0, check_y + int((y / 2) * ydir))
-                # print("check sx={} sy={}".format(sx,sy))
-                if MouseButtonPressEvent.is_match(regn_data, full_data, sx, sy, GLOBAL_W, GLOBAL_H):
-                    #print("found sx={} sy={}".format(sx, sy))
-                    return (sx, sy)
-        return None        
+        for x in range(0, GLOBAL_W):
+            for y in range(0, GLOBAL_H):
+                regn_pixel = regn_data[y, x]
+                full_pixel = full_data[check_y + y, check_x + x]
+                diff_r = full_pixel[0] - regn_pixel[0]
+                diff_g = full_pixel[1] - regn_pixel[1]
+                diff_b = full_pixel[2] - regn_pixel[2]
+
+                if abs(diff_r) > 10 or abs(diff_g) > 10 or abs(diff_b) > 10:
+                    found = False
+                    break
+            if not found:
+                break
+        if found:
+            return (mouse_x0, mouse_y0)
+        return None
+    # @staticmethod
+    # def get_mouse_position(regn_data, full_data, mouse_x0, mouse_y0):
+    #     check_x = mouse_x0
+    #     check_y = mouse_y0
+    #
+    #     # print("check_x sx={} sy={}".format(check_x, check_y))
+    #     for x in range(0, 400):
+    #         for y in range(0, 400):
+    #             xdir = 1 if x % 2 == 0 else -1
+    #             ydir = 1 if y % 2 == 0 else -1
+    #             sx = max(0, check_x + int((x / 2) * xdir))
+    #             sy = max(0, check_y + int((y / 2) * ydir))
+    #             # print("check sx={} sy={}".format(sx,sy))
+    #             if MouseButtonPressEvent.is_match(regn_data, full_data, sx, sy, GLOBAL_W, GLOBAL_H):
+    #                 #print("found sx={} sy={}".format(sx, sy))
+    #                 return (sx, sy)
+    #     return None
     
     def execute(self):
         found = False
@@ -727,9 +753,10 @@ def callback(event):
 
     if type(event) == winput.MouseEvent:
         if event.action == winput.WM_LBUTTONDOWN:
-            beg_x = max(0, event.position[0] - int(GLOBAL_W/2))
-            beg_y = max(0, event.position[1] - int(GLOBAL_H/2))
-            img = pyautogui.screenshot(region=[beg_x, beg_y, GLOBAL_W, GLOBAL_H])
+            # beg_x = max(0, event.position[0] - int(GLOBAL_W/2))
+            # beg_y = max(0, event.position[1] - int(GLOBAL_H/2))
+            # img = pyautogui.screenshot(region=[beg_x, beg_y, GLOBAL_W, GLOBAL_H])
+            img = pyautogui.screenshot(region=[event.position[0], event.position[1], GLOBAL_W, GLOBAL_H])
             event.additional_data = np.asarray(img)
     raw_data.append((perf_counter_ns(), event))
 
