@@ -361,6 +361,8 @@ class MouseButtonPressEvent(MouseButtonEvent):
     
     def execute(self):
         found = False
+        # time.sleep(0.2)
+
         (mouse_x0, mouse_y0) = winput.get_mouse_pos()
         for zz in range(0,100):
             full_img = pyautogui.screenshot(region=[0, 0, mouse_x0+GLOBAL_W, mouse_y0+GLOBAL_H]) # x,y,w,h
@@ -488,7 +490,7 @@ class EventExecutor:
                 time.sleep(1 / 1000.)
 
             if not continue_playback:
-                return
+                return 0
 
             if enable_playback_interruption:
                 winput.get_message()
@@ -496,9 +498,12 @@ class EventExecutor:
             now = perf_counter_ns()
 
         if not continue_playback:
-            return
+            return 0
 
+        stime = perf_counter_ns()
         self.event.execute()
+        dtime = perf_counter_ns() - stime
+        return dtime
 
     def to_dict(self):
         return {
@@ -586,7 +591,10 @@ class Macro:
             
         start_time = perf_counter_ns()
         for executor in self.event_executor_list:
-            executor.execute_at_time_offset(start_time)
+            use_time = executor.execute_at_time_offset(start_time)
+            start_time += use_time
+            # if use_time > 1000:
+            #     print(use_time)
 
             if not continue_playback:
                 break
