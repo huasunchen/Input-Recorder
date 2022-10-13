@@ -1,0 +1,7 @@
+winput>=1.4.0
+Pillow
+pyautogui
+numpy
+opencv-python
+opencv-contrib-python
+matplotlib
