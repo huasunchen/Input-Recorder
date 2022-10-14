@@ -332,21 +332,21 @@ class MouseButtonPressEvent(MouseButtonEvent):
         matches = bf.match(desc_full, desc_regn)
         matches = sorted(matches, key=lambda x: x.distance)
         match_position = kp_full[matches[0].queryIdx].pt
-        match_distance = matches[0].distance
-        match_dist2 = pow(match_position[0] - mouse_x0,2) + pow(match_position[1] - mouse_y0,2)
-        for mm in matches:
-            if abs(mm.distance - match_distance) > 3:
-                continue
-            pt = kp_full[mm.queryIdx].pt
-            dist2 = pow(pt[0] - mouse_x0,2) + pow(pt[1] - mouse_y0,2)
-            if dist2 < match_dist2:
-                match_dist2 = dist2
-                match_position = pt
+        # match_distance = matches[0].distance
+        # match_dist2 = pow(match_position[0] - mouse_x0,2) + pow(match_position[1] - mouse_y0,2)
+        # for mm in matches:
+        #     if abs(mm.distance - match_distance) > 3:
+        #         continue
+        #     pt = kp_full[mm.queryIdx].pt
+        #     dist2 = pow(pt[0] - mouse_x0,2) + pow(pt[1] - mouse_y0,2)
+        #     if dist2 < match_dist2:
+        #         match_dist2 = dist2
+        #         match_position = pt
 
         print("match distance=", matches[0].distance, "pt=", match_position, "mouse_t=", (mouse_x0, mouse_y0))
 
         if matches[0].distance < 150:
-            return (int(match_position[0]), int(match_position[1]))
+            return (mouse_x0, mouse_y0)
         return None
 
     def execute(self):
@@ -358,7 +358,7 @@ class MouseButtonPressEvent(MouseButtonEvent):
 
         (mouse_x0, mouse_y0) = winput.get_mouse_pos()
         for zz in range(0,100):
-            full_img = pyautogui.screenshot(region=[0, 0, 1920, 1080]) # x,y,w,h
+            full_img = pyautogui.screenshot(region=[mouse_x0 - GLOBAL_HALF_W, mouse_y0 - GLOBAL_HALF_H, GLOBAL_W, GLOBAL_H]) # x,y,w,h
             full_img.save("match_full.png")
             mouse_should_pos = MouseButtonPressEvent.get_mouse_position(mouse_x0, mouse_y0)
             if mouse_should_pos == None:
