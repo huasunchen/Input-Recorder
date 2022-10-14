@@ -332,11 +332,21 @@ class MouseButtonPressEvent(MouseButtonEvent):
         matches = bf.match(desc_full, desc_regn)
         matches = sorted(matches, key=lambda x: x.distance)
         match_position = kp_full[matches[0].queryIdx].pt
-        print("match distance=", matches[0].distance)
+        match_distance = matches[0].distance
+        match_dist2 = pow(match_position[0] - mouse_x0,2) + pow(match_position[1] - mouse_y0,2)
+        for mm in matches:
+            if abs(mm.distance - match_distance) > 3:
+                continue
+            pt = kp_full[mm.queryIdx].pt
+            dist2 = pow(pt[0] - mouse_x0,2) + pow(pt[1] - mouse_y0,2)
+            if dist2 < match_dist2:
+                match_dist2 = dist2
+                match_position = pt
 
-        (px, py) = match_position
+        print("match distance=", matches[0].distance, "pt=", match_position, "mouse_t=", (mouse_x0, mouse_y0))
+
         if matches[0].distance < 150:
-            return (px + GLOBAL_HALF_W, py + GLOBAL_HALF_H)
+            return (int(match_position[0]), int(match_position[1]))
         return None
 
     def execute(self):
@@ -359,7 +369,7 @@ class MouseButtonPressEvent(MouseButtonEvent):
                 time.sleep(0.05)
                 continue
             (mouse_x, mouse_y) = mouse_should_pos
-            #winput.set_mouse_pos(mouse_x + int(GLOBAL_W/2), int(mouse_y + GLOBAL_H/2))
+            winput.set_mouse_pos(mouse_x, mouse_y)
             winput.press_mouse_button(self.mouse_button)
             found = True
             break
