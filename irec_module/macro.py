@@ -317,6 +317,25 @@ class MouseButtonPressEvent(MouseButtonEvent):
     def is_match(rd, fd, sx, sy, w, h):
         return np.array_equal(rd, fd[sy:sy+h, sx:sx+w])
 
+
+    @staticmethod
+    def check_color(full_img, regn_img):
+        import cv2
+        regn_data = cv2.cvtColor(regn_img, cv2.COLOR_BGR2RGB)
+        full_data = cv2.cvtColor(full_img, cv2.COLOR_BGR2RGB)
+        diff_num = 0;
+        for x in range(0, GLOBAL_W):
+            for y in range(0, GLOBAL_H):
+                regn_pixel = regn_data[y, x]
+                full_pixel = full_data[y, x]
+                diff_r = int(full_pixel[0]) - int(regn_pixel[0])
+                diff_g = int(full_pixel[1]) - int(regn_pixel[1])
+                diff_b = int(full_pixel[2]) - int(regn_pixel[2])
+                DIFF = 20
+                if abs(diff_r) > DIFF or abs(diff_g) > DIFF or abs(diff_b) > DIFF:
+                    ++diff_num
+        return diff_num < (GLOBAL_W * GLOBAL_H) * 0.1
+
     @staticmethod
     def get_mouse_position(mouse_x0, mouse_y0):
         import cv2
@@ -329,7 +348,7 @@ class MouseButtonPressEvent(MouseButtonEvent):
         kp_regn, desc_regn = sift.detectAndCompute(regn_img, None)
 
         if len(kp_full) == 0 or len(kp_regn) == 0:
-            if abs(len(kp_full) - len(kp_regn)) < 3:
+            if MouseButtonPressEvent.check_color(full_img, regn_img):
                 return (mouse_x0, mouse_y0)
             return None
 
