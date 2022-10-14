@@ -27,8 +27,8 @@ import pyautogui
 import numpy as np
 from PIL import Image
 
-GLOBAL_W = 4
-GLOBAL_H = 4
+GLOBAL_W = 64
+GLOBAL_H = 64
 GLOBAL_HALF_W = int(GLOBAL_W/2)
 GLOBAL_HALF_H = int(GLOBAL_H/2)
 
@@ -318,60 +318,43 @@ class MouseButtonPressEvent(MouseButtonEvent):
         return np.array_equal(rd, fd[sy:sy+h, sx:sx+w])
 
     @staticmethod
-    def get_mouse_position(regn_data, full_data, mouse_x0, mouse_y0):
-        check_x = mouse_x0
-        check_y = mouse_y0
+    def get_mouse_position(mouse_x0, mouse_y0):
+        import cv2
 
-        found = True
-        # print("check_x sx={} sy={}".format(check_x, check_y))
-        for x in range(0, GLOBAL_W):
-            for y in range(0, GLOBAL_H):
-                regn_pixel = regn_data[y, x]
-                full_pixel = full_data[check_y + y, check_x + x]
-                diff_r = int(full_pixel[0]) - int(regn_pixel[0])
-                diff_g = int(full_pixel[1]) - int(regn_pixel[1])
-                diff_b = int(full_pixel[2]) - int(regn_pixel[2])
-                DIFF = 26
-                if abs(diff_r) > DIFF or abs(diff_g) > DIFF or abs(diff_b) > DIFF:
-                    found = False
-                    print(diff_r,diff_g,diff_b)
-                    break
-            if not found:
-                break
-        if found:
-            return (mouse_x0, mouse_y0)
+        sift = cv2.xfeatures2d.SIFT_create()
+        full_img = cv2.imread('match_full.png', 0)
+        regn_img = cv2.imread('match_regn.png', 0)
+
+        kp_full, desc_full = sift.detectAndCompute(full_img, None)
+        kp_regn, desc_regn = sift.detectAndCompute(regn_img, None)
+
+        bf = cv2.BFMatcher(crossCheck=True)
+        matches = bf.match(desc_full, desc_regn)
+        matches = sorted(matches, key=lambda x: x.distance)
+        match_position = kp_full[matches[0].queryIdx].pt
+        print("match distance=", matches[0].distance)
+
+        (px, py) = match_position
+        if matches[0].distance < 150:
+            return (px + GLOBAL_HALF_W, py + GLOBAL_HALF_H)
         return None
-    # @staticmethod
-    # def get_mouse_position(regn_data, full_data, mouse_x0, mouse_y0):
-    #     check_x = mouse_x0
-    #     check_y = mouse_y0
-    #
-    #     # print("check_x sx={} sy={}".format(check_x, check_y))
-    #     for x in range(0, 400):
-    #         for y in range(0, 400):
-    #             xdir = 1 if x % 2 == 0 else -1
-    #             ydir = 1 if y % 2 == 0 else -1
-    #             sx = max(0, check_x + int((x / 2) * xdir))
-    #             sy = max(0, check_y + int((y / 2) * ydir))
-    #             # print("check sx={} sy={}".format(sx,sy))
-    #             if MouseButtonPressEvent.is_match(regn_data, full_data, sx, sy, GLOBAL_W, GLOBAL_H):
-    #                 #print("found sx={} sy={}".format(sx, sy))
-    #                 return (sx, sy)
-    #     return None
-    
+
     def execute(self):
         found = False
         # time.sleep(0.2)
 
+        regn_img = Image.fromarray(np.uint8(self.region_data))
+        regn_img.save('match_regn.png')
+
         (mouse_x0, mouse_y0) = winput.get_mouse_pos()
         for zz in range(0,100):
-            full_img = pyautogui.screenshot(region=[0, 0, mouse_x0+GLOBAL_W, mouse_y0+GLOBAL_H]) # x,y,w,h
-            full_data = np.asarray(full_img)
-            mouse_should_pos = MouseButtonPressEvent.get_mouse_position(self.region_data, full_data, mouse_x0, mouse_y0)
+            full_img = pyautogui.screenshot(region=[0, 0, 1920, 1080]) # x,y,w,h
+            full_img.save("match_full.png")
+            mouse_should_pos = MouseButtonPressEvent.get_mouse_position(mouse_x0, mouse_y0)
             if mouse_should_pos == None:
-                regn_img2 = Image.fromarray(np.uint8(self.region_data))
-                regn_img2.save('test_match/screenshot_regn.png')
-                full_img.save('test_match/screenshot_full.png')
+                # regn_img2 = Image.fromarray(np.uint8(self.region_data))
+                # regn_img2.save('test_match/screenshot_regn.png')
+                # full_img.save('test_match/screenshot_full.png')
                 print("mouse position no matched! mouse pos={}".format((mouse_x0, mouse_y0)))
                 time.sleep(0.05)
                 continue
@@ -683,10 +666,6 @@ class Macro:
 
     @staticmethod
     def from_raw_data(name, start_time, start_mouse_pos, screen_width, screen_height, raw_data):
-        import pyautogui
-        import numpy as np
-        from PIL import Image
-
         event_executor_list = []
 
         macro_config = MacroConfig(screen_width, screen_height)
@@ -762,10 +741,9 @@ def callback(event):
 
     if type(event) == winput.MouseEvent:
         if event.action == winput.WM_LBUTTONDOWN:
-            # beg_x = max(0, event.position[0] - int(GLOBAL_W/2))
-            # beg_y = max(0, event.position[1] - int(GLOBAL_H/2))
-            # img = pyautogui.screenshot(region=[beg_x, beg_y, GLOBAL_W, GLOBAL_H])
-            img = pyautogui.screenshot(region=[event.position[0], event.position[1], GLOBAL_W, GLOBAL_H])
+            beg_x = max(0,event.position[0] - GLOBAL_HALF_W)
+            beg_y = max(0,event.position[1] - GLOBAL_HALF_H)
+            img = pyautogui.screenshot(region=[beg_x, beg_y, GLOBAL_W, GLOBAL_H])
             event.additional_data = np.asarray(img)
     raw_data.append((perf_counter_ns(), event))
 
