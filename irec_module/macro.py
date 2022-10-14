@@ -328,10 +328,15 @@ class MouseButtonPressEvent(MouseButtonEvent):
         kp_full, desc_full = sift.detectAndCompute(full_img, None)
         kp_regn, desc_regn = sift.detectAndCompute(regn_img, None)
 
+        if len(kp_full) == 0 or len(kp_regn) == 0:
+            if abs(len(kp_full) - len(kp_regn)) < 3:
+                return (mouse_x0, mouse_y0)
+            return None
+
         bf = cv2.BFMatcher(crossCheck=True)
         matches = bf.match(desc_full, desc_regn)
         matches = sorted(matches, key=lambda x: x.distance)
-        match_position = kp_full[matches[0].queryIdx].pt
+        match_position = kp_full[matches[0].queryIdx].pt if len(matches) > 0 else (-1,-1)
         # match_distance = matches[0].distance
         # match_dist2 = pow(match_position[0] - mouse_x0,2) + pow(match_position[1] - mouse_y0,2)
         # for mm in matches:
