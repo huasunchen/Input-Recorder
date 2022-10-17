@@ -377,6 +377,7 @@ class MouseButtonPressEvent(MouseButtonEvent):
         return None
 
     def execute(self):
+        import keyboard
         global continue_playback
         global GLOBAL_STEP_ID
 
@@ -390,8 +391,8 @@ class MouseButtonPressEvent(MouseButtonEvent):
         mouse_x0 = self.x
         mouse_y0 = self.y
         for zz in range(0,100):
-            if not continue_playback:
-                print("停止播放")
+            if keyboard.is_pressed("esc"):
+                exit(1)
                 return
             full_img = pyautogui.screenshot(region=[mouse_x0 - GLOBAL_HALF_W, mouse_y0 - GLOBAL_HALF_H, GLOBAL_W, GLOBAL_H]) # x,y,w,h
             full_img.save("match_full.png")
