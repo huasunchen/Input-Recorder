@@ -31,6 +31,7 @@ GLOBAL_W = 64
 GLOBAL_H = 64
 GLOBAL_HALF_W = int(GLOBAL_W/2)
 GLOBAL_HALF_H = int(GLOBAL_H/2)
+GLOBAL_STEP_ID = 0
 
 float_to_bytes = lambda f: bytes(ctypes.c_float(f))
 bytes_to_float = lambda b: ctypes.cast(b, ctypes.POINTER(ctypes.c_float)).contents.value
@@ -376,14 +377,26 @@ class MouseButtonPressEvent(MouseButtonEvent):
         return None
 
     def execute(self):
+        import keyboard
+        global continue_playback
+        global GLOBAL_STEP_ID
+
         found = False
+        GLOBAL_STEP_ID = GLOBAL_STEP_ID + 1
         # time.sleep(0.2)
 
         regn_img = Image.fromarray(np.uint8(self.region_data))
         regn_img.save('match_regn.png')
 
-        (mouse_x0, mouse_y0) = (self.x, self.y)
-        for zz in range(0,1000):
+        mouse_x0 = self.x
+        mouse_y0 = self.y
+        for zz in range(0,100):
+            if keyboard.is_pressed("esc"):
+                full_img = pyautogui.screenshot(region=[mouse_x0 - GLOBAL_HALF_W, mouse_y0 - GLOBAL_HALF_H, GLOBAL_W, GLOBAL_H])  # x,y,w,h
+                regn_img.save('match_{}_regn.png'.format(GLOBAL_STEP_ID))
+                full_img.save('match_{}_full.png'.format(GLOBAL_STEP_ID))
+                exit(1)
+                return
             full_img = pyautogui.screenshot(region=[mouse_x0 - GLOBAL_HALF_W, mouse_y0 - GLOBAL_HALF_H, GLOBAL_W, GLOBAL_H]) # x,y,w,h
             full_img.save("match_full.png")
             mouse_should_pos = MouseButtonPressEvent.get_mouse_position(mouse_x0, mouse_y0)
@@ -394,13 +407,15 @@ class MouseButtonPressEvent(MouseButtonEvent):
                 print("mouse position no matched! mouse pos={}".format((mouse_x0, mouse_y0)))
                 time.sleep(0.05)
                 continue
-            (mouse_x, mouse_y) = mouse_should_pos
-            winput.set_mouse_pos(mouse_x, mouse_y)
+            winput.set_mouse_pos(self.x, self.y)
             winput.press_mouse_button(self.mouse_button)
             found = True
             break
         if not found:
-            winput.set_mouse_pos(mouse_x0, mouse_y0)
+            full_img = pyautogui.screenshot(region=[mouse_x0 - GLOBAL_HALF_W, mouse_y0 - GLOBAL_HALF_H, GLOBAL_W, GLOBAL_H])  # x,y,w,h
+            regn_img.save('match_{}_regn.png'.format(GLOBAL_STEP_ID))
+            full_img.save('match_{}_full.png'.format(GLOBAL_STEP_ID))
+            winput.set_mouse_pos(self.x, self.y)
             winput.press_mouse_button(self.mouse_button)
 
     def __str__(self):
