@@ -376,6 +376,8 @@ class MouseButtonPressEvent(MouseButtonEvent):
         return None
 
     def execute(self):
+        global continue_playback
+
         found = False
         # time.sleep(0.2)
 
@@ -384,6 +386,9 @@ class MouseButtonPressEvent(MouseButtonEvent):
 
         (mouse_x0, mouse_y0) = (self.x, self.y)
         for zz in range(0,100):
+            if not continue_playback:
+                print("停止播放")
+                return
             full_img = pyautogui.screenshot(region=[mouse_x0 - GLOBAL_HALF_W, mouse_y0 - GLOBAL_HALF_H, GLOBAL_W, GLOBAL_H]) # x,y,w,h
             full_img.save("match_full.png")
             mouse_should_pos = MouseButtonPressEvent.get_mouse_position(mouse_x0, mouse_y0)
