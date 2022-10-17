@@ -392,6 +392,9 @@ class MouseButtonPressEvent(MouseButtonEvent):
         mouse_y0 = self.y
         for zz in range(0,100):
             if keyboard.is_pressed("esc"):
+                full_img = pyautogui.screenshot(region=[mouse_x0 - GLOBAL_HALF_W, mouse_y0 - GLOBAL_HALF_H, GLOBAL_W, GLOBAL_H])  # x,y,w,h
+                regn_img.save('match_{}_regn.png'.format(GLOBAL_STEP_ID))
+                full_img.save('match_{}_full.png'.format(GLOBAL_STEP_ID))
                 exit(1)
                 return
             full_img = pyautogui.screenshot(region=[mouse_x0 - GLOBAL_HALF_W, mouse_y0 - GLOBAL_HALF_H, GLOBAL_W, GLOBAL_H]) # x,y,w,h
@@ -412,7 +415,6 @@ class MouseButtonPressEvent(MouseButtonEvent):
             full_img = pyautogui.screenshot(region=[mouse_x0 - GLOBAL_HALF_W, mouse_y0 - GLOBAL_HALF_H, GLOBAL_W, GLOBAL_H])  # x,y,w,h
             regn_img.save('match_{}_regn.png'.format(GLOBAL_STEP_ID))
             full_img.save('match_{}_full.png'.format(GLOBAL_STEP_ID))
-
             winput.set_mouse_pos(self.x, self.y)
             winput.press_mouse_button(self.mouse_button)
 
