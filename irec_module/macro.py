@@ -297,21 +297,23 @@ class MouseButtonEvent(MacroEvent):
 class MouseButtonPressEvent(MouseButtonEvent):
     bytecode = b"B"
 
-    def __init__(self, mouse_button, region_data):
+    def __init__(self, mouse_button, region_data, x, y):
         super().__init__(mouse_button)
         self.region_data = region_data
+        self.x = x
+        self.y = y
         # print("__init__={}".format(self.region_data))
 
     def to_bytes(self):
-        return self.bytecode + self.mouse_button.to_bytes(1, "little") + self.region_data.tobytes()
+        return self.bytecode + self.mouse_button.to_bytes(1, "little") + self.x.to_bytes(2, "little")  + self.y.to_bytes(2, "little") + self.region_data.tobytes()
     
     @classmethod
     def from_bytes(cls, config, bytes_obj):
         assert type(bytes_obj) == bytes and len(bytes_obj) >= 2 and bytes_obj[0:1] == cls.bytecode
-        deserialized_bytes = np.frombuffer(bytes_obj[2:], dtype=np.uint8)
+        deserialized_bytes = np.frombuffer(bytes_obj[6:], dtype=np.uint8)
         deserialized = np.reshape(deserialized_bytes, newshape=(GLOBAL_W, GLOBAL_H, 3))
         # print("deserialized={}".format(deserialized))
-        return MouseButtonPressEvent(int.from_bytes(bytes_obj[1:2], "little"), deserialized)
+        return MouseButtonPressEvent(int.from_bytes(bytes_obj[1:2], "little"), deserialized, int.from_bytes(bytes_obj[2:4], "little"), int.from_bytes(bytes_obj[4:6], "little"))
 
     @staticmethod
     def is_match(rd, fd, sx, sy, w, h):
@@ -380,7 +382,7 @@ class MouseButtonPressEvent(MouseButtonEvent):
         regn_img = Image.fromarray(np.uint8(self.region_data))
         regn_img.save('match_regn.png')
 
-        (mouse_x0, mouse_y0) = winput.get_mouse_pos()
+        (mouse_x0, mouse_y0) = (self.x, self.y)
         for zz in range(0,100):
             full_img = pyautogui.screenshot(region=[mouse_x0 - GLOBAL_HALF_W, mouse_y0 - GLOBAL_HALF_H, GLOBAL_W, GLOBAL_H]) # x,y,w,h
             full_img.save("match_full.png")
@@ -398,7 +400,7 @@ class MouseButtonPressEvent(MouseButtonEvent):
             found = True
             break
         if not found:
-            #winput.set_mouse_pos(mouse_x0, mouse_y0)
+            winput.set_mouse_pos(mouse_x0, mouse_y0)
             winput.press_mouse_button(self.mouse_button)
 
     def __str__(self):
@@ -720,26 +722,26 @@ class Macro:
                     last_mouse_pos = raw_event.position
 
                 elif raw_event.action == winput.WM_LBUTTONDOWN:
-                    event = MouseButtonPressEvent(winput.LEFT_MOUSE_BUTTON, raw_event.additional_data)
+                    event = MouseButtonPressEvent(winput.LEFT_MOUSE_BUTTON, raw_event.additional_data, last_mouse_pos[0], last_mouse_pos[1])
  
 
                 elif raw_event.action == winput.WM_LBUTTONUP:
                     event = MouseButtonReleaseEvent(winput.LEFT_MOUSE_BUTTON)
 
                 elif raw_event.action == winput.WM_RBUTTONDOWN:
-                    event = MouseButtonPressEvent(winput.RIGHT_MOUSE_BUTTON, np.uint8([]))
+                    event = MouseButtonPressEvent(winput.RIGHT_MOUSE_BUTTON, np.uint8([]), last_mouse_pos[0], last_mouse_pos[1])
 
                 elif raw_event.action == winput.WM_RBUTTONUP:
                     event = MouseButtonReleaseEvent(winput.RIGHT_MOUSE_BUTTON)
 
                 elif raw_event.action == winput.WM_MBUTTONDOWN:
-                    event = MouseButtonPressEvent(winput.MIDDLE_MOUSE_BUTTON, np.uint8([]))
+                    event = MouseButtonPressEvent(winput.MIDDLE_MOUSE_BUTTON, np.uint8([]), last_mouse_pos[0], last_mouse_pos[1])
 
                 elif raw_event.action == winput.WM_MBUTTONUP:
                     event = MouseButtonReleaseEvent(winput.MIDDLE_MOUSE_BUTTON)
 
                 elif raw_event.action == winput.WM_XBUTTONDOWN:
-                    event = MouseButtonPressEvent(getattr(winput, "XMB" + str(raw_event.additional_data)), np.uint8([]))
+                    event = MouseButtonPressEvent(getattr(winput, "XMB" + str(raw_event.additional_data)), np.uint8([]), last_mouse_pos[0], last_mouse_pos[1])
 
                 elif raw_event.action == winput.WM_XBUTTONUP:
                     event = MouseButtonReleaseEvent(getattr(winput, "XMB" + str(raw_event.additional_data)))
