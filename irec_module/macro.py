@@ -25,7 +25,12 @@ except ImportError:
 import winput, time, ctypes, zlib, json
 import pyautogui
 import numpy as np
+import base64, io
 from PIL import Image
+import cv2
+from irec_module.util import is_similar_image
+from openpyxl import Workbook, load_workbook
+from openpyxl.drawing.image import Image as ODII
 
 GLOBAL_W = 64
 GLOBAL_H = 64
@@ -307,7 +312,31 @@ class MouseButtonPressEvent(MouseButtonEvent):
 
     def to_bytes(self):
         return self.bytecode + self.mouse_button.to_bytes(1, "little") + self.x.to_bytes(2, "little")  + self.y.to_bytes(2, "little") + self.region_data.tobytes()
-    
+
+    def to_dict(self):
+        return {
+            "type"  : self.__class__.__name__,
+            "mouse_button": self.mouse_button,
+            "x": self.x,
+            "y": self.y,
+            "img": base64.b64encode(self.region_data.tobytes()).decode()
+        }
+
+    @classmethod
+    def from_dict(cls, config, as_dict):
+        assert "type" in as_dict and \
+               "mouse_button" in as_dict and \
+               "img" in as_dict
+
+        assert as_dict["type"] == cls.__name__
+        assert type(as_dict["mouse_button"]) == int
+        if as_dict["img"]:
+            img_decoded = base64.b64decode(as_dict["img"])
+            img_data = np.reshape(np.frombuffer(img_decoded, dtype=np.uint8), newshape=(GLOBAL_W, GLOBAL_H, 3))
+        else:
+            img_data = []
+        return cls(as_dict["mouse_button"], img_data, as_dict["x"], as_dict["y"])
+
     @classmethod
     def from_bytes(cls, config, bytes_obj):
         assert type(bytes_obj) == bytes and len(bytes_obj) >= 2 and bytes_obj[0:1] == cls.bytecode
@@ -323,7 +352,7 @@ class MouseButtonPressEvent(MouseButtonEvent):
 
     @staticmethod
     def check_color(full_img, regn_img):
-        import cv2
+        # import cv2
         regn_data = cv2.cvtColor(regn_img, cv2.COLOR_BGR2RGB)
         full_data = cv2.cvtColor(full_img, cv2.COLOR_BGR2RGB)
         diff_num = 0;
@@ -341,7 +370,7 @@ class MouseButtonPressEvent(MouseButtonEvent):
 
     @staticmethod
     def get_mouse_position(mouse_x0, mouse_y0):
-        import cv2
+        # import cv2
 
         sift = cv2.xfeatures2d.SIFT_create()
         full_img = cv2.imread('match_full.png', 0)
@@ -384,37 +413,40 @@ class MouseButtonPressEvent(MouseButtonEvent):
         found = False
         GLOBAL_STEP_ID = GLOBAL_STEP_ID + 1
         # time.sleep(0.2)
-
-        regn_img = Image.fromarray(np.uint8(self.region_data))
-        regn_img.save('match_regn.png')
-
         mouse_x0 = self.x
         mouse_y0 = self.y
-        for zz in range(0,1000):
-            if keyboard.is_pressed("esc"):
+        if len(self.region_data) > 0:
+            regn_img = Image.fromarray(np.uint8(self.region_data))
+            regn_img.save('match_regn.png')
+
+            for zz in range(0,1000):
+                if keyboard.is_pressed("esc"):
+                    full_img = pyautogui.screenshot(region=[mouse_x0 - GLOBAL_HALF_W, mouse_y0 - GLOBAL_HALF_H, GLOBAL_W, GLOBAL_H])  # x,y,w,h
+                    regn_img.save('match_{}_regn.png'.format(GLOBAL_STEP_ID))
+                    full_img.save('match_{}_full.png'.format(GLOBAL_STEP_ID))
+                    exit(1)
+                    return
+                full_img = pyautogui.screenshot(region=[mouse_x0 - GLOBAL_HALF_W, mouse_y0 - GLOBAL_HALF_H, GLOBAL_W, GLOBAL_H]) # x,y,w,h
+                full_img.save("match_full.png")
+                mouse_should_pos = MouseButtonPressEvent.get_mouse_position(mouse_x0, mouse_y0)
+                if mouse_should_pos == None:
+                    # regn_img2 = Image.fromarray(np.uint8(self.region_data))
+                    # regn_img2.save('test_match/screenshot_regn.png')
+                    # full_img.save('test_match/screenshot_full.png')
+                    print("mouse position no matched! mouse pos={}".format((mouse_x0, mouse_y0)))
+                    time.sleep(0.05)
+                    continue
+                winput.set_mouse_pos(self.x, self.y)
+                winput.press_mouse_button(self.mouse_button)
+                found = True
+                break
+            if not found:
                 full_img = pyautogui.screenshot(region=[mouse_x0 - GLOBAL_HALF_W, mouse_y0 - GLOBAL_HALF_H, GLOBAL_W, GLOBAL_H])  # x,y,w,h
                 regn_img.save('match_{}_regn.png'.format(GLOBAL_STEP_ID))
                 full_img.save('match_{}_full.png'.format(GLOBAL_STEP_ID))
-                exit(1)
-                return
-            full_img = pyautogui.screenshot(region=[mouse_x0 - GLOBAL_HALF_W, mouse_y0 - GLOBAL_HALF_H, GLOBAL_W, GLOBAL_H]) # x,y,w,h
-            full_img.save("match_full.png")
-            mouse_should_pos = MouseButtonPressEvent.get_mouse_position(mouse_x0, mouse_y0)
-            if mouse_should_pos == None:
-                # regn_img2 = Image.fromarray(np.uint8(self.region_data))
-                # regn_img2.save('test_match/screenshot_regn.png')
-                # full_img.save('test_match/screenshot_full.png')
-                print("mouse position no matched! mouse pos={}".format((mouse_x0, mouse_y0)))
-                time.sleep(0.05)
-                continue
-            winput.set_mouse_pos(self.x, self.y)
-            winput.press_mouse_button(self.mouse_button)
-            found = True
-            break
-        if not found:
-            full_img = pyautogui.screenshot(region=[mouse_x0 - GLOBAL_HALF_W, mouse_y0 - GLOBAL_HALF_H, GLOBAL_W, GLOBAL_H])  # x,y,w,h
-            regn_img.save('match_{}_regn.png'.format(GLOBAL_STEP_ID))
-            full_img.save('match_{}_full.png'.format(GLOBAL_STEP_ID))
+                winput.set_mouse_pos(self.x, self.y)
+                winput.press_mouse_button(self.mouse_button)
+        else:
             winput.set_mouse_pos(self.x, self.y)
             winput.press_mouse_button(self.mouse_button)
 
@@ -814,7 +846,7 @@ def callback_only_stop_key(event):
 
     if event.vkCode == stop_recording_key:
         winput.stop()
-    
+
 
 def create_macro(name, start_at, screen_width, screen_height):
     global start, raw_data, stop_recording_key
@@ -895,6 +927,121 @@ def macros_from_json(string):
 
     macros_dict_list = json.loads(string)
 
+    return list(map(lambda md: Macro.from_dict(md), macros_dict_list))
+
+def macros_to_excel(file_name, *macros):
+    assert macros and all(map(lambda m: isinstance(m, Macro), macros))
+    macros_dict = list(map(lambda mcr: mcr.to_dict(), macros))[0]
+    title_name = macros_dict["name"]
+    event_name = "event_executor_list"
+    wb = Workbook()
+    ws = wb.active
+    ws.title = title_name
+    for key, value in macros_dict["config"].items():
+        ws.append([key, value])
+    ws1 = wb.create_sheet(title=event_name, index=1)
+    colu_list = []
+    rows_list = []
+    pic_list = []
+    for event in macros_dict[event_name]:
+        tmp = []
+        for k, v in event.items():
+            if k != "event" and k not in colu_list:
+                colu_list.append(k)
+                colu_list.append("verifyPicture")
+            elif k == "event":
+                for x, y in v.items():
+                    if x not in colu_list:
+                        colu_list.append(x)
+        for key, value in event.items():
+            if key != "event":
+                tmp.append(value)
+                tmp.append(True)
+                continue
+            tmp.append(value["type"])
+            tmp.append(value["x"] if "x" in value else None)
+            tmp.append(value["y"] if "y" in value else None)
+            tmp.append(value["mouse_button"] if "mouse_button" in value else None)
+            if "img" in value:
+                base64_data_str = value["img"]
+                base64_data_bytes = base64_data_str.encode('utf-8')
+                img_decoded = base64.b64decode(base64_data_bytes)
+                nparr = np.reshape(np.frombuffer(img_decoded, dtype=np.uint8), newshape=(GLOBAL_W, GLOBAL_H, 3))
+                segment_data = cv2.cvtColor(nparr, cv2.COLOR_BGR2RGB)  # IMREAD_GRAYSCALE
+                regn_img = Image.fromarray(np.uint8(segment_data))
+                regn_img.save(f'.tmp\\{value["x"]}.png')
+                pic_list.append(f'.tmp\\{value["x"]}.png')
+            else:
+                pic_list.append(None)
+        rows_list.append(tmp)
+    ws1.append(colu_list)
+    for x in rows_list:
+        ws1.append(x)
+    wb.save(file_name)
+    wb1 = load_workbook(file_name)
+    sheet = wb1[event_name]
+    star_num = 2
+    for pic in pic_list:
+        if pic:
+            img = ODII(pic)
+            sheet.add_image(img, f'G{star_num}')
+        else:
+            sheet[f'G{star_num}'] = pic
+        star_num += 1
+    wb1.save(file_name)
+
+def macros_from_excel(file_name):
+    xlsx = load_workbook(file_name)
+    sheet_names = xlsx.sheetnames
+    macros_data = {}
+    for sheet_name in sheet_names:
+        ws = xlsx[sheet_name]
+        if "_" not in sheet_name:
+            macros_data["name"] = sheet_name
+            col_data = list(ws.iter_cols(values_only=True))
+            col_key = col_data[0]
+            col_value = col_data[1:]
+            for col in col_value:
+                macros_data["config"] = dict(zip(col_key, col))
+        else:
+            cases_list = []
+            datas = list(ws.iter_rows(values_only=True))
+            case_title = datas[0]
+            # case_title.reomove("verifyPicture")
+            case_datas = datas[1:]
+            for case in case_datas:
+                result = dict(zip(case_title, case))
+                tmp_dict = {}
+                for k, v in result.items():
+                    if k == "time_offset":
+                        tmp_dict[k] = v
+                    elif k == "verifyPicture" and v:
+                        continue
+                    elif k == "verifyPicture" and not v:
+                        tmp_dict.setdefault("event", {})["img"] = v
+                    elif k == "mouse_button" and v == None:
+                        continue
+                    elif k == "img" and v == None:
+                        continue
+                    elif k == "x" and v == None:
+                        continue
+                    elif k == "y" and v == None:
+                        continue
+                    else:
+                        tmp_dict.setdefault("event", {})[k] = v
+                cases_list.append(tmp_dict)
+            _images = {}
+            for image in ws._images:
+                row = image.anchor._from.row
+                img = Image.open(io.BytesIO(image._data()))
+                _images[row - 1] = base64.b64encode(np.array(img).tobytes()).decode()
+            for index, value in _images.items():
+                if "img" in cases_list[index]["event"]:
+                    continue
+                cases_list[index]["event"]["img"] = value
+            macros_data[sheet_name] = cases_list
+    xlsx.close()
+    macros_dict_list = json.loads(json.dumps([macros_data], indent=4))
     return list(map(lambda md: Macro.from_dict(md), macros_dict_list))
 
 def macros_to_bytes(*macros, compressionlevel=9):

@@ -308,7 +308,7 @@ def start_countdown(macro_name, length):
 def save_macros_dialog():
     global macro_list, autosave_file_var
 
-    file_ = filedialog.asksaveasfile("wb", filetypes=[("Binary Macro", "*.mcr"), ("Human Readable Macro", "*.json"), ("All files", "*.*")], defaultextension="*.mcr")
+    file_ = filedialog.asksaveasfile("wb", filetypes=[("Binary Macro", "*.mcr"), ("Human Readable Excel", "*.xlsx"), ("Human Readable Macro", "*.json"), ("All files", "*.*")], defaultextension="*.mcr")
         
     if file_ is None:
         return
@@ -319,25 +319,29 @@ def save_macros_dialog():
 
     if file_ext.lower() == ".json":
         file_.write(macro.macros_to_json(*macro_list, indent=4).encode())
+    elif file_ext.lower() == ".xlsx":
+        macro.macros_to_excel(file_.name, *macro_list)
     else:
         file_.write(macro.macros_to_bytes(*macro_list, compressionlevel=int(config.get("compression_level", "9"))))
-        
+
     file_.close()
+
 
 def load_macros_dialog():
     global macro_list, autosave_file_var
 
-    file_ = filedialog.askopenfile("rb", filetypes=[("Binary Macro", "*.mcr"), ("Human Readable Macro", "*.json"), ("All files", "*.*")], defaultextension="*.mcr")
-    
+    file_ = filedialog.askopenfile("rb", filetypes=[("Binary Macro", "*.mcr"), ("Human Readable Excel", "*.xlsx"), ("Human Readable Macro", "*.json"), ("All files", "*.*")], defaultextension="*.mcr")
+
     if file_ is None:
         return
 
     autosave_file_var.set(file_.name)
 
     file_ext = os.path.splitext(file_.name)[1]
-
     if file_ext.lower() == ".json":
         macro_list = macro.macros_from_json(file_.read().decode())
+    elif file_ext.lower() == ".xlsx":
+        macro_list = macro.macros_from_excel(os.path.abspath(file_.name))
     else:
         macro_list = macro.macros_from_bytes(file_.read())
         
