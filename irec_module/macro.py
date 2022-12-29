@@ -25,7 +25,7 @@ except ImportError:
 import winput, time, ctypes, zlib, json
 import pyautogui
 import numpy as np
-import base64, io
+import base64, io, os
 from PIL import Image
 import cv2
 from irec_module.util import is_similar_image
@@ -405,6 +405,16 @@ class MouseButtonPressEvent(MouseButtonEvent):
             return (mouse_x0, mouse_y0)
         return None
 
+    def report(self):
+        time.sleep(2)
+        cwd = os.getcwd()
+        file_path = f"{cwd}\\report\\{case_name}"
+        if os.path.exists(file_path):
+            pyautogui.screenshot(f"{file_path}\\{time.strftime('%Y%m%d%H%M%S')}.png")
+        else:
+            os.makedirs(file_path)
+            pyautogui.screenshot(f"{file_path}\\{time.strftime('%Y%m%d%H%M%S')}.png")
+
     def execute(self):
         import keyboard
         global continue_playback
@@ -449,6 +459,7 @@ class MouseButtonPressEvent(MouseButtonEvent):
         else:
             winput.set_mouse_pos(self.x, self.y)
             winput.press_mouse_button(self.mouse_button)
+        self.report()
 
     def __str__(self):
         return "Press {} mouse button".format(util.mouse_button_to_name(self.mouse_button).lower())
@@ -642,13 +653,13 @@ class Macro:
             continue_playback = False
 
     def run(self):
-        global continue_playback, enable_playback_interruption
+        global continue_playback, enable_playback_interruption, case_name
         
         for executor in self.event_executor_list:
             executor.prepare()
 
         continue_playback = True
-
+        case_name = self.name
         enable_playback_interruption = config.get("enable_stop_playback_key", False)
 
         if enable_playback_interruption:
